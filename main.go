@@ -149,7 +149,7 @@ func NetworkConcatStr(NetworkInfos []map[string]string, tmpMsg string) (EndMsg s
 		if len(NetworkInfos[i]) == 0 {
 			continue
 		}
-		EndMsg += fmt.Sprintf("    " + NetworkInfos[i]["device"] + "\n")
+		EndMsg += fmt.Sprintf("    " + NetworkInfos[i]["device"] + ":\n")
 		for k, v := range NetworkInfos[i] {
 			if v != "" {
 				EndMsg += fmt.Sprintf("      %s: %s\n", strings.ToLower(k), v)
