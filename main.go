@@ -1,13 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var nodeExporterBuildInfo = make(map[string]string)
@@ -20,6 +21,7 @@ func main() {
 	// 接收命令行参数
 	ip := flag.String("ip", "", "目标IP")
 	port := flag.String("p", "", "目标Port")
+	mode := flag.Bool("a", false, "export mode")
 	flag.Parse()
 	// 判断参数是否完整
 	if *ip == "" || *port == "" {
@@ -55,31 +57,54 @@ func main() {
 	NetworkExtractMsg(resp[networkStartIndex:], "node_network_info{")
 	//（4）提取node_uname_info信息的子串
 	unameResult, _ := CommonExtractMsg(resp[tmpindex:], "node_uname_info{")
-	// 逐个序列化
-	json.Unmarshal([]byte(dmiResult), &nodeDmiInfo)
-	json.Unmarshal([]byte(buildResult), &nodeExporterBuildInfo)
-	json.Unmarshal([]byte(osResult), &nodeOsInfo)
-	json.Unmarshal([]byte(unameResult), &nodeUnameInfo)
 
-	// 最终结果输出
-	EndMsg := fmt.Sprintf("Prometheus Node Exporter:\n")
-	EndMsg += CommonConcatStr(nodeExporterBuildInfo, "  node_exporter_build_info:\n")
-	EndMsg += CommonConcatStr(nodeOsInfo, "  node_os_info:\n")
-	EndMsg += CommonConcatStr(nodeUnameInfo, "  node_uname_info:\n")
-	EndMsg += CommonConcatStr(nodeDmiInfo, "  node_dmi_info:\n")
-	EndMsg += NetworkConcatStr(nodeNetworkInfos, "  node_network_info:\n")
-	fmt.Println(EndMsg)
+	// 判断是否需要反序列化
+	if len(dmiResult) == 0 && len(buildResult) == 0 && len(osResult) == 0 && len(unameResult) == 0 {
+		fmt.Println("Prometheus Node Exporter is Null")
+	} else {
+		// 逐个反序列化
+		json.Unmarshal([]byte(dmiResult), &nodeDmiInfo)
+		json.Unmarshal([]byte(buildResult), &nodeExporterBuildInfo)
+		json.Unmarshal([]byte(osResult), &nodeOsInfo)
+		json.Unmarshal([]byte(unameResult), &nodeUnameInfo)
+		// 最终结果输出
+		EndMsg := fmt.Sprintf("Prometheus Node Exporter:\n")
+		EndMsg += CommonConcatStr(nodeExporterBuildInfo, "  node_exporter_build_info:\n")
+		EndMsg += CommonConcatStr(nodeOsInfo, "  node_os_info:\n")
+		EndMsg += CommonConcatStr(nodeUnameInfo, "  node_uname_info:\n")
+		EndMsg += CommonConcatStr(nodeDmiInfo, "  node_dmi_info:\n")
+		EndMsg += NetworkConcatStr(nodeNetworkInfos, "  node_network_info:\n")
+		fmt.Println(EndMsg)
+	}
+	//全部section输出
+	if *mode {
+		fmt.Printf("All Prometheus Metrics data:  \n%s", resp)
+	}
 }
 
 // SendReq 发送请求
 func SendReq(ip string, port string) (string, error) {
+	go func() {
+		fmt.Printf("[response] The request is being sent\tip:%s\tport:%s\n", ip, port)
+		time.Sleep(5 * time.Second)
+		fmt.Println("[response] Slow response to requests, please be patient")
+	}()
 	resp, err := http.Get("http://" + ip + ":" + port + "/metrics")
 	if err != nil {
 		return "", err
 	}
+	fmt.Println("[response] Response obtained（响应已获取）")
 	defer resp.Body.Close()
-	s, err := io.ReadAll(resp.Body)
-	return string(s), nil
+	var s string
+	// 逐行读取，剔除非关键信息
+	reader := bufio.NewScanner(resp.Body)
+	for reader.Scan() {
+		line := reader.Text()
+		if !strings.HasPrefix(line, "#") {
+			s += fmt.Sprintf("  %s\n", line)
+		}
+	}
+	return s, nil
 }
 
 // CommonExtractMsg 公共模块
@@ -112,7 +137,7 @@ func NetworkExtractMsg(resp, findstr string) {
 		// 提取子串的内容
 		result := strings.ReplaceAll(resp[startIndex+len(findstr)-1:endIndex], "=", ":")
 		// 把多余的部分截掉，使其可以被反序列化为对象
-		result = strings.TrimLeft(result, "nfo")
+		result = strings.TrimLeft(result, "_info")
 		// 正则并且加引号，使其称为JSON格式
 		re := regexp.MustCompile(`(\w+):([^,]+)`)
 		result = re.ReplaceAllString(result, `"$1":$2`)

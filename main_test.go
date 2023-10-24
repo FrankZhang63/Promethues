@@ -13,9 +13,9 @@ func TestSendReq(t *testing.T) {
 		ip   string
 		port string
 	}{
-		{"172.96.3.215", "9100"},   //正确
-		{"109.121.46.238", "9143"}, //正确
-		{"109.121.46.238", "9100"}, //错误
+		{"172.96.3.215", "9100"},    //正确
+		{"109.121.46.238", "9143"},  //正确
+		{"207.246.115.110", "9090"}, //正确
 	}
 	for _, tc := range testCases {
 		t.Run(tc.ip, func(t *testing.T) {
@@ -24,7 +24,6 @@ func TestSendReq(t *testing.T) {
 			if err != nil && !strings.Contains(err.Error(), "No connection could be made because the target machine actively refused it") {
 				t.Fatalf("unexpected error: %v", err)
 			}
-
 			if req == "" && err == nil {
 				t.Fatal("unexpect error:", err)
 			}
