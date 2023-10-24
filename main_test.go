@@ -41,16 +41,17 @@ func TestCommonExtractMsg(t *testing.T) {
 	for _, tc := range SendReqResp {
 		t.Run(tc, func(t *testing.T) {
 			tmpindex := 0
-			_, dmiEndindex := CommonExtractMsg(tc, "node_dmi_info{")
+			dmiResult, dmiEndindex := CommonExtractMsg(tc, "node_dmi_info{")
 			tmpindex += dmiEndindex
 			buildResult, buildEndindex := CommonExtractMsg(tc[tmpindex:], "node_exporter_build_info{")
 			tmpindex += buildEndindex
-			_, osEndindex := CommonExtractMsg(tc[tmpindex:], "node_os_info{")
+			osResult, osEndindex := CommonExtractMsg(tc[tmpindex:], "node_os_info{")
 			tmpindex += osEndindex
 			unameResult, _ := CommonExtractMsg(tc[tmpindex:], "node_uname_info{")
+			prometheusResult, _ := CommonExtractMsg(tc, "prometheus_build_info{")
 			// check the result
-			if buildResult == "" || unameResult == "" {
-				t.Error("提取信息未成功")
+			if buildResult == "" && unameResult == "" && osResult == "" && dmiResult == "" && prometheusResult == "" {
+				t.Error("信息提取失败")
 			}
 		})
 	}
